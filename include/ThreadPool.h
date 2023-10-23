@@ -13,6 +13,7 @@ class ThreadPool {
     ~ThreadPool();
     void thread_run();
     long *buf;
+    int fcnt;
 
   private:
     pthread_t *threads;
@@ -22,7 +23,7 @@ class ThreadPool {
 };
 
 void *thread_func(void *arg);
-void quicksort(ThreadPool &pool, int no);
-void readfile(const string filename, long *buf, size_t size);
+void quicksort(long *buf, size_t size);
+void split_sort(const string filename, int cnt, long *buf, size_t size);
 
 #endif
