@@ -13,7 +13,6 @@ class ThreadPool {
     ~ThreadPool();
     void thread_run();
     long *buf;
-    int fcnt;
 
   private:
     pthread_t *threads;
