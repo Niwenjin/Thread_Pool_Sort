@@ -25,5 +25,7 @@ class ThreadPool {
 void *thread_func(void *arg);
 void quicksort(long *buf, size_t size);
 void split_sort(const string filename, int cnt, long *buf, size_t size);
+void merge(const string file_1, const string file_2, long *buf, size_t size);
+int getfile(string &file_1, string &file_2);
 
 #endif
