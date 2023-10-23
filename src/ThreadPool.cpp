@@ -1,9 +1,13 @@
 #include "ThreadPool.h"
 #include <cstdlib>
+#include <fstream>
 #include <pthread.h>
 
 #define THREAD_NUM 4
 #define BUFFER_SIZE 67108864
+#define MIN_SIZE 1677216
+
+using std::ifstream;
 
 ThreadPool::ThreadPool() {
     threads = (pthread_t *)malloc(sizeof(pthread_t) * THREAD_NUM);
@@ -20,13 +24,13 @@ ThreadPool::~ThreadPool() {
 
 void ThreadPool::thread_run() {
     for (int i = 0; i < THREAD_NUM; ++i)
-        pthread_create(threads + i, nullptr, thread_func, (void *)i);
+        pthread_create(threads + i, nullptr, thread_func, &i);
     for (int i = 0; i < THREAD_NUM; ++i)
         pthread_join(threads[i], nullptr);
 }
 
 void *thread_func(void *arg) {
-    ThreadPool *pool = static_cast<ThreadPool *>(arg);
+    int *no = static_cast<int *>(arg);
 
     while (true) {
         // pthread_mutex_lock(&pool->queue_mutex);
@@ -47,4 +51,17 @@ void *thread_func(void *arg) {
     }
 }
 
-void ThreadPool::task_init(){}
+int cmp(const void *a, const void *b) { return (*(long *)a - *(long *)b); }
+
+void quicksort(ThreadPool &pool, int no) {
+    qsort(pool.buf + MIN_SIZE * no, MIN_SIZE, sizeof(long), cmp);
+}
+
+void readfile(const string filename, long *buf, size_t size) {
+    ifstream file(filename);
+    for (int i = 0; i < size; i++)
+        file >> buf[i];
+    file.close();
+}
+
+void ThreadPool::task_init() {}
