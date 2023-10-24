@@ -1,5 +1,5 @@
 #include "Task.h"
 
-Task::Task(const std::function<int(const std::string &)> &func,
-           const std::string &filename)
+Task::Task(const function<int(const string &, int)> &func,
+           const string &filename)
     : func(func), filename(filename) {}

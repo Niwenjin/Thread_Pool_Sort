@@ -8,8 +8,9 @@ using std::string;
 
 class Task {
   public:
-    Task(const std::function<int(const std::string &)> &, const string &);
-    function<int(const string &)> func;
+    Task(const function<int(const string &, int)> &, const string &);
+    function<int(const string &, int)> func;
     const string filename;
+    int thread_no;
 };
 #endif
