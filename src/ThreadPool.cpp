@@ -1,4 +1,5 @@
 #include "ThreadPool.h"
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -9,8 +10,8 @@
 #define BUFFER_SIZE 67108864
 #define MIN_SIZE 1677216
 const string filepath = "/home/Niwenjin/Projects/Thread_Pool_Sort/files/";
-int fcnt = 0;
 
+using std::bind;
 using std::ifstream;
 using std::ofstream;
 using std::to_string;
@@ -21,6 +22,7 @@ ThreadPool::ThreadPool() {
     threads = (pthread_t *)malloc(sizeof(pthread_t) * THREAD_NUM);
     buf = (long *)malloc(BUFFER_SIZE);
     mutex = PTHREAD_MUTEX_INITIALIZER;
+    queue_cond = PTHREAD_COND_INITIALIZER;
     fcnt = -1;
     task_init();
 }
@@ -29,6 +31,7 @@ ThreadPool::~ThreadPool() {
     free(threads);
     free(buf);
     pthread_mutex_destroy(&mutex);
+    pthread_cond_destroy(&queue_cond);
 }
 
 void ThreadPool::thread_run() {
@@ -38,33 +41,59 @@ void ThreadPool::thread_run() {
         pthread_join(threads[i], nullptr);
 }
 
-void *thread_func(void *arg) {
-    int *no = static_cast<int *>(arg);
+void ThreadPool::task_init() {
+    // 添加文件分块排序任务
+    for (const auto &entry : directory_iterator(filepath))
+        if (entry.is_regular_file() && entry.path().extension() == ".txt") {
+            function<int(const std::string &)> func =
+                bind(&ThreadPool::task_split, this, entry.path().filename());
+            Task task(func, entry.path().filename());
+            add_task(task);
+        }
+    // 添加合并文件任务
+    function<int(const string &)> func =
+        bind(&ThreadPool::task_merge, this, string());
+    Task task(func, string());
+    add_task(task);
+}
 
-    while (true) {
-        // pthread_mutex_lock(&pool->queue_mutex);
+void ThreadPool::add_task(Task task) {
+    pthread_mutex_lock(&mutex);
+    task_queue.push(task);
+    pthread_mutex_unlock(&mutex);
+    pthread_cond_signal(&queue_cond);
+}
 
-        // 检查任务队列是否为空
-        // while (pool->task_queue.empty()) {
-        //     pthread_cond_wait(&pool->queue_cond, &pool->queue_mutex);
-        // }
+void *ThreadPool::thread_func(void *arg) {
+    ThreadPool *pool = static_cast<ThreadPool *>(arg);
 
-        // // 从队列中取出一个任务
-        // Task task = pool->task_queue.back();
-        // pool->task_queue.pop_back();
+    while (pool->task_queue.empty()) {
+        pthread_mutex_lock(&pool->mutex);
+        pthread_cond_wait(&pool->queue_cond, &pool->mutex);
 
-        // pthread_mutex_unlock(&pool->queue_mutex);
+        // 从队列中取出一个任务
+        Task task = pool->task_queue.front();
+        pool->task_queue.pop();
 
-        // // 执行任务函数
-        // task.func(task.arg);
+        pthread_mutex_unlock(&pool->mutex);
+
+        // 执行任务函数
+        int result = task.func(task.filename);
+        // 任务执行完毕，出队
+        if (result == 0)
+            pool->task_queue.pop();
     }
+
+    return nullptr;
 }
 
 int cmp(const void *a, const void *b) { return (*(long *)a - *(long *)b); }
 
-void quicksort(long *buf, size_t size) { qsort(buf, size, sizeof(long), cmp); }
+void ThreadPool::quicksort(long *buf, size_t size) {
+    qsort(buf, size, sizeof(long), cmp);
+}
 
-void split_sort(const string filename, long *buf, size_t size) {
+void ThreadPool::split_sort(const string &filename, size_t size) {
     ifstream input(filepath + filename);
     while (!input.eof()) {
         // 将文件分成大小相等的块
@@ -82,7 +111,7 @@ void split_sort(const string filename, long *buf, size_t size) {
     input.close();
 }
 
-void merge(const string file_1, const string file_2, long *buf, size_t size) {
+void ThreadPool::merge(const string file_1, const string file_2, size_t size) {
     ifstream input_1(filepath + file_1);
     ifstream input_2(filepath + file_2);
     int mid = size / 2;
@@ -143,7 +172,7 @@ void merge(const string file_1, const string file_2, long *buf, size_t size) {
     remove(filepath + file_2);
 }
 
-int getfile(string &file_1, string &file_2) {
+int ThreadPool::getfile(string &file_1, string &file_2) {
     int cnt = 0;
     for (const auto &entry : directory_iterator(filepath))
         if (entry.is_regular_file() && entry.path().extension() == ".tmp") {
@@ -159,4 +188,21 @@ int getfile(string &file_1, string &file_2) {
     return -1;
 }
 
-void ThreadPool::task_init() {}
+void ThreadPool::rename(const string &filename) {
+    std::filesystem::rename(filename, "output.txt");
+}
+
+int ThreadPool::task_split(const string &filename) {
+    split_sort(filename, MIN_SIZE);
+    return 0;
+}
+
+int ThreadPool::task_merge(const string &) {
+    string file_1, file_2;
+    if (getfile(file_1, file_2) < 0) {
+        rename(file_1);
+        return 0;
+    } else
+        merge(file_1, file_2, MIN_SIZE);
+    return -1;
+}
