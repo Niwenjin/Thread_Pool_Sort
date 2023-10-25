@@ -62,9 +62,8 @@ void *ThreadPool::thread_func(void *arg) {
     auto it = find(pool->threads, pool->threads + THREAD_NUM, self);
     int thread_no = it - pool->threads;
 
-    if (thread_no != 0)
+    if (thread_no != 2)
         return nullptr;
-    cout << "thread_no: " << thread_no << endl;
 
     // 执行分裂任务
     while (!pool->task_split_queue.empty()) {
@@ -91,12 +90,11 @@ void *ThreadPool::thread_func(void *arg) {
         // pthread_mutex_unlock(&pool->mutex);
 
         // 执行任务函数
-        if (task.flag)
-            pool->rename(task.filename_1);
-        else {
+        if (!task.flag) {
             task.func(task.filename_1, task.filename_2, thread_no);
             pool->add_task_merge();
-        }
+        } else
+            pool->rename(task.filename_1);
     }
 
     return nullptr;
@@ -206,31 +204,36 @@ int ThreadPool::getfile(string &file_1, string &file_2) {
 }
 
 void ThreadPool::rename(const string &filename) {
-    std::filesystem::rename(filename, "output.txt");
+    std::filesystem::rename(filepath + filename, filepath + "output.txt");
 }
 
 void ThreadPool::task_split(const string &filename, int thread_no) {
+    cout << "split file:" << filename << "----thread " << thread_no << endl;
     split_sort(filename, buf + thread_no * MIN_SIZE, MIN_SIZE);
 }
 
 void ThreadPool::task_merge(const string &file_1, const string &file_2,
                             int thread_no) {
+    cout << "merge file: " << file_1 << " & " << file_2 << "----thread "
+         << thread_no << endl;
     merge(file_1, file_2, buf + thread_no * MIN_SIZE, MIN_SIZE);
 }
 
 void ThreadPool::add_task_split(const string &filename) {
     function<void(const string &, int)> func =
-        bind(&ThreadPool::task_split, this, string(), 0);
+        bind(&ThreadPool::task_split, this, std::placeholders::_1,
+             std::placeholders::_2);
     Task_Split task(func, filename);
     task_split_queue.push(task);
 }
 
 void ThreadPool::add_task_merge() {
     function<void(const string &, const string &, int)> func =
-        bind(&ThreadPool::task_merge, this, string(), string(), 0);
+        bind(&ThreadPool::task_merge, this, std::placeholders::_1,
+             std::placeholders::_2, std::placeholders::_3);
     string file_1, file_2;
     bool flag = false;
-    if (getfile(file_1, file_2))
+    if (getfile(file_1, file_2) < 0)
         flag = true;
     Task_Merge task(func, file_1, file_2, flag);
     task_merge_queue.push(task);
