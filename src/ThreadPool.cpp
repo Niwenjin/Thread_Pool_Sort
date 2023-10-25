@@ -48,24 +48,10 @@ void ThreadPool::thread_run() {
 void ThreadPool::task_init() {
     // 添加文件分块排序任务
     for (const auto &entry : directory_iterator(filepath))
-        if (entry.is_regular_file() && entry.path().extension() == ".txt") {
-            function<int(const std::string &, int)> func =
-                bind(&ThreadPool::task_split, this, entry.path().filename(), 0);
-            Task task(func, entry.path().filename());
-            add_task(task);
-        }
+        if (entry.is_regular_file() && entry.path().extension() == ".txt")
+            add_task_split(entry.path().filename());
     // 添加合并文件任务
-    function<int(const string &, int)> func =
-        bind(&ThreadPool::task_merge, this, string(), 0);
-    Task task(func, string());
-    add_task(task);
-}
-
-void ThreadPool::add_task(Task task) {
-    // pthread_mutex_lock(&mutex);
-    task_queue.push(task);
-    // pthread_mutex_unlock(&mutex);
-    // pthread_cond_signal(&queue_cond);
+    add_task_merge();
 }
 
 void *ThreadPool::thread_func(void *arg) {
@@ -80,20 +66,37 @@ void *ThreadPool::thread_func(void *arg) {
         return nullptr;
     cout << "thread_no: " << thread_no << endl;
 
-    while (!pool->task_queue.empty()) {
+    // 执行分裂任务
+    while (!pool->task_split_queue.empty()) {
         // pthread_mutex_lock(&pool->mutex);
         // pthread_cond_wait(&pool->queue_cond, &pool->mutex);
 
         // 从队列中取出一个任务
-        Task task = pool->task_queue.front();
-
+        Task_Split task = pool->task_split_queue.front();
+        pool->task_split_queue.pop();
         // pthread_mutex_unlock(&pool->mutex);
 
         // 执行任务函数
-        int result = task.func(task.filename, thread_no);
-        // 任务执行完毕，出队
-        if (result == 0)
-            pool->task_queue.pop();
+        task.func(task.filename, thread_no);
+    }
+
+    // 执行合并任务
+    while (!pool->task_merge_queue.empty()) {
+        // pthread_mutex_lock(&pool->mutex);
+        // pthread_cond_wait(&pool->queue_cond, &pool->mutex);
+
+        // 从队列中取出一个任务
+        Task_Merge task = pool->task_merge_queue.front();
+        pool->task_merge_queue.pop();
+        // pthread_mutex_unlock(&pool->mutex);
+
+        // 执行任务函数
+        if (task.flag)
+            pool->rename(task.filename_1);
+        else {
+            task.func(task.filename_1, task.filename_2, thread_no);
+            pool->add_task_merge();
+        }
     }
 
     return nullptr;
@@ -206,18 +209,29 @@ void ThreadPool::rename(const string &filename) {
     std::filesystem::rename(filename, "output.txt");
 }
 
-int ThreadPool::task_split(const string &filename, int thread_no) {
+void ThreadPool::task_split(const string &filename, int thread_no) {
     split_sort(filename, buf + thread_no * MIN_SIZE, MIN_SIZE);
-    return 0;
 }
 
-int ThreadPool::task_merge(const string &, int thread_no) {
+void ThreadPool::task_merge(const string &file_1, const string &file_2,
+                            int thread_no) {
+    merge(file_1, file_2, buf + thread_no * MIN_SIZE, MIN_SIZE);
+}
+
+void ThreadPool::add_task_split(const string &filename) {
+    function<void(const string &, int)> func =
+        bind(&ThreadPool::task_split, this, string(), 0);
+    Task_Split task(func, filename);
+    task_split_queue.push(task);
+}
+
+void ThreadPool::add_task_merge() {
+    function<void(const string &, const string &, int)> func =
+        bind(&ThreadPool::task_merge, this, string(), string(), 0);
     string file_1, file_2;
-    if (getfile(file_1, file_2) < 0) {
-        // 剩余一个文件，即为所求的输出结果
-        rename(file_1);
-        return 0;
-    } else
-        merge(file_1, file_2, buf + thread_no * MIN_SIZE, MIN_SIZE);
-    return -1;
+    bool flag = false;
+    if (getfile(file_1, file_2))
+        flag = true;
+    Task_Merge task(func, file_1, file_2, flag);
+    task_merge_queue.push(task);
 }

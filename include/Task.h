@@ -6,11 +6,22 @@
 using std::function;
 using std::string;
 
-class Task {
+class Task_Split {
   public:
-    Task(const function<int(const string &, int)> &, const string &);
-    function<int(const string &, int)> func;
+    Task_Split(const function<void(const string &, int)> &, const string &);
+    function<void(const string &, int)> func;
     const string filename;
+    int thread_no;
+};
+
+class Task_Merge {
+  public:
+    Task_Merge(const function<void(const string &, const string &, int)> &,
+               const string &, const string &, bool);
+    function<void(const string &, const string &, int)> func;
+    const string filename_1;
+    const string filename_2;
+    bool flag;
     int thread_no;
 };
 #endif
