@@ -18,8 +18,8 @@ class ThreadPool {
   private:
     pthread_t *threads;
     queue<Task> task_queue;
-    pthread_mutex_t mutex;
-    pthread_cond_t queue_cond;
+    // pthread_mutex_t mutex;
+    // pthread_cond_t queue_cond;
     long *buf;
     int fcnt = -1;
     static void *thread_func(void *arg);

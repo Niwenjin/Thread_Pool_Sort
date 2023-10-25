@@ -3,15 +3,18 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <pthread.h>
 #include <string>
 
 #define THREAD_NUM 4
 #define BUFFER_SIZE 67108864
-#define MIN_SIZE 1677216
+#define MIN_SIZE 2097152
 const string filepath = "/home/Niwenjin/Projects/Thread_Pool_Sort/files/";
 
 using std::bind;
+using std::cout;
+using std::endl;
 using std::find;
 using std::ifstream;
 using std::ofstream;
@@ -22,8 +25,8 @@ using std::filesystem::remove;
 ThreadPool::ThreadPool() {
     threads = (pthread_t *)malloc(sizeof(pthread_t) * THREAD_NUM);
     buf = (long *)malloc(BUFFER_SIZE);
-    mutex = PTHREAD_MUTEX_INITIALIZER;
-    queue_cond = PTHREAD_COND_INITIALIZER;
+    // mutex = PTHREAD_MUTEX_INITIALIZER;
+    // queue_cond = PTHREAD_COND_INITIALIZER;
     fcnt = -1;
     task_init();
 }
@@ -31,8 +34,8 @@ ThreadPool::ThreadPool() {
 ThreadPool::~ThreadPool() {
     free(threads);
     free(buf);
-    pthread_mutex_destroy(&mutex);
-    pthread_cond_destroy(&queue_cond);
+    // pthread_mutex_destroy(&mutex);
+    // pthread_cond_destroy(&queue_cond);
 }
 
 void ThreadPool::thread_run() {
@@ -59,10 +62,10 @@ void ThreadPool::task_init() {
 }
 
 void ThreadPool::add_task(Task task) {
-    pthread_mutex_lock(&mutex);
+    // pthread_mutex_lock(&mutex);
     task_queue.push(task);
-    pthread_mutex_unlock(&mutex);
-    pthread_cond_signal(&queue_cond);
+    // pthread_mutex_unlock(&mutex);
+    // pthread_cond_signal(&queue_cond);
 }
 
 void *ThreadPool::thread_func(void *arg) {
@@ -73,15 +76,18 @@ void *ThreadPool::thread_func(void *arg) {
     auto it = find(pool->threads, pool->threads + THREAD_NUM, self);
     int thread_no = it - pool->threads;
 
-    while (pool->task_queue.empty()) {
-        pthread_mutex_lock(&pool->mutex);
-        pthread_cond_wait(&pool->queue_cond, &pool->mutex);
+    if (thread_no != 0)
+        return nullptr;
+    cout << "thread_no: " << thread_no << endl;
+
+    while (!pool->task_queue.empty()) {
+        // pthread_mutex_lock(&pool->mutex);
+        // pthread_cond_wait(&pool->queue_cond, &pool->mutex);
 
         // 从队列中取出一个任务
         Task task = pool->task_queue.front();
-        pool->task_queue.pop();
 
-        pthread_mutex_unlock(&pool->mutex);
+        // pthread_mutex_unlock(&pool->mutex);
 
         // 执行任务函数
         int result = task.func(task.filename, thread_no);
@@ -129,7 +135,7 @@ void ThreadPool::merge(const string file_1, const string file_2, long *buf,
     }
 
     string tmpname = to_string(++fcnt) + ".tmp";
-    ofstream output("");
+    ofstream output(filepath + tmpname);
     int i = 0, j = mid;
     while (true) {
         // 逐个比较两个有序文件中的数据
