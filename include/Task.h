@@ -17,11 +17,10 @@ class Task_Split {
 class Task_Merge {
   public:
     Task_Merge(const function<void(const string &, const string &, int)> &,
-               const string &, const string &, bool);
+               const string &, const string &);
     function<void(const string &, const string &, int)> func;
     const string filename_1;
     const string filename_2;
-    bool flag;
     int thread_no;
 };
 #endif
