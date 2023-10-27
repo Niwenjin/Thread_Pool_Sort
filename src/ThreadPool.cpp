@@ -111,6 +111,7 @@ void *ThreadPool::thread_func(void *arg) {
                 pthread_exit(nullptr);
             }
 
+            // 等待任务信号
             pthread_cond_wait(&pool->cond_merge_queue,
                               &pool->mutex_merge_queue);
         }

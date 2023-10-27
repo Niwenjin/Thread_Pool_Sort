@@ -37,9 +37,10 @@ class ThreadPool {
 
     bool active_threads[4] = {true, true, true, true};
 
-    static void *thread_func(void *arg);
-    void task_init();
+    static void *thread_func(void *arg); // 线程运行函数
+    void task_init();                    // 初始化任务队列
 
+    // 封装任务函数
     void task_split(const string &, int);
     void task_merge(const string &, const string &, int);
 
@@ -48,10 +49,11 @@ class ThreadPool {
     void add_tmp_file(const string &);
 
     void quicksort(long *buf, size_t size);
-    void split_sort(const string &filename, long *buf, size_t size);
+    void split_sort(const string &filename, long *buf,
+                    size_t size);                // 在特定缓冲区内排序
     void merge(const string file_1, const string file_2, long *buf,
-               size_t size);
-    int getfile(string &file_1, string &file_2);
+               size_t size);                     // 在特定缓冲区内合并文件并写回
+    int getfile(string &file_1, string &file_2); // 从临时文件队列中取得文件
     void rename(const string &);
     bool all_done();
 };
